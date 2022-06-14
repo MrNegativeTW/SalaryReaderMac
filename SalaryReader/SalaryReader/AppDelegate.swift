@@ -6,10 +6,7 @@
 //
 
 import Cocoa
-import Foundation
-import var CommonCrypto.CC_MD5_DIGEST_LENGTH
-import func CommonCrypto.CC_MD5
-import typealias CommonCrypto.CC_LONG
+import CryptoKit
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -51,12 +48,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if (response == NSApplication.ModalResponse.alertFirstButtonReturn) {
                 print(textField.stringValue)
                 if (!textField.stringValue.isEmpty) {
-                    let md5Data = convertToMD5(string: textField.stringValue)
-                    let md5Hex =  md5Data.map { String(format: "%02hhx", $0) }.joined()
-                    print("md5Hex: \(md5Hex)")
+                    let md5String = convertToMD5(string: textField.stringValue)
+                    print("md5: \(md5String)")
                     
-                    let md5Base64 = md5Data.base64EncodedString()
-                    print("md5Base64: \(md5Base64)")
+                    let utf8str = md5String.data(using: .utf8)
+                    
+                    if let base64Encoded = utf8str?.base64EncodedString(options: Data.Base64EncodingOptions(rawValue: 0)) {
+                        print("base64 encoded: \(base64Encoded)")
+
+                        if let base64Decoded = Data(base64Encoded: base64Encoded, options: Data.Base64DecodingOptions(rawValue: 0))
+                        .map({ String(data: $0, encoding: .utf8) }) {
+                            // Convert back to a string
+                            print("base64 decoded: \(base64Decoded ?? "")")
+                        }
+                    }
+//                    let md5Base64 = md5Data.base64EncodedString()
+//                    print("md5Base64: \(md5Base64)")
                 }
             }
         }
@@ -70,21 +77,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Insert code here to tear down your application
     }
     
-    func convertToMD5(string: String) -> Data {
-        let length = Int(CC_MD5_DIGEST_LENGTH)
-        let messageData = string.data(using:.utf8)!
-        var digestData = Data(count: length)
+    func convertToMD5(string: String) -> String {
+        let digest = Insecure.MD5.hash(data: string.data(using: .utf8) ?? Data())
         
-        _ = digestData.withUnsafeMutableBytes { digestBytes -> UInt8 in
-            messageData.withUnsafeBytes { messageBytes -> UInt8 in
-                if let messageBytesBaseAddress = messageBytes.baseAddress, let digestBytesBlindMemory = digestBytes.bindMemory(to: UInt8.self).baseAddress {
-                    let messageLength = CC_LONG(messageData.count)
-                    CC_MD5(messageBytesBaseAddress, messageLength, digestBytesBlindMemory)
-                }
-                return 0
-            }
-        }
-        return digestData
+        return digest.map {
+            String(format: "%02hhx", $0)
+        }.joined()
     }
     
 }
